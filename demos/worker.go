@@ -3,34 +3,45 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
+type WaitGroupWrapper struct {
+	sync.WaitGroup
+}
+
+func (w *WaitGroupWrapper) Wrap(cb func()) {
+	w.Add(1)
+	go func() {
+		defer w.Done()
+		cb()
+	}()
+}
+
 type Worker struct {
-	stop chan struct{}
+	cancel context.CancelFunc
 }
 
 func NewWorker() *Worker {
-	return &Worker{
-		stop: make(chan struct{}),
-	}
+	return &Worker{}
 }
 
 func (w *Worker) Run() {
 
+	wg := WaitGroupWrapper{}
 	ctx, cancel := context.WithCancel(context.Background())
-	go w.ProcessBlock(ctx)
-	go w.ProcessMempoolTransaction(ctx)
+	w.cancel = cancel
 
-	for {
-		select {
-		case <-w.stop:
-			cancel()
-			return
-		default:
-			time.Sleep(time.Millisecond * 100)
-		}
-	}
+	wg.Wrap(func() {
+		w.Process1(ctx)
+	})
+
+	wg.Wrap(func() {
+		w.Process2(ctx)
+	})
+
+	wg.Wait()
 }
 
 func (w *Worker) isDone(ctx context.Context) bool {
@@ -44,12 +55,12 @@ func (w *Worker) isDone(ctx context.Context) bool {
 }
 
 func (w *Worker) Stop() {
-	w.stop <- struct{}{}
+	w.cancel()
 }
 
-func (w *Worker) ProcessBlock(ctx context.Context) {
-	fmt.Println("ProcessBlock")
-	defer fmt.Println("ProcessBlock end")
+func (w *Worker) Process1(ctx context.Context) {
+	fmt.Println("Process1")
+	defer fmt.Println("Process1 end")
 
 	for {
 		if w.isDone(ctx) {
@@ -61,9 +72,9 @@ func (w *Worker) ProcessBlock(ctx context.Context) {
 	}
 }
 
-func (w *Worker) ProcessMempoolTransaction(ctx context.Context) {
-	fmt.Println("ProcessMempoolTransaction")
-	defer fmt.Println("ProcessMempoolTransaction end")
+func (w *Worker) Process2(ctx context.Context) {
+	fmt.Println("Process2")
+	defer fmt.Println("Process2 end")
 
 	for {
 		if w.isDone(ctx) {
@@ -78,6 +89,7 @@ func main() {
 	w := NewWorker()
 	go func() {
 		w.Run()
+		fmt.Println("w.Run()")
 	}()
 	for {
 		time.Sleep(time.Second * 2)
