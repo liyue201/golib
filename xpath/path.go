@@ -1,10 +1,10 @@
-package path
+package xpath
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
-	"os/exec"
 )
 
 func IsExist(strPath string) bool {
@@ -29,7 +29,7 @@ func GetExeDirPath() string {
 	return exeDir
 }
 
-func IsRelactivePath(path string) bool {
+func IsRelativePath(path string) bool {
 	if strings.Index(path, ".") == 0 {
 		return true
 	}
@@ -37,10 +37,18 @@ func IsRelactivePath(path string) bool {
 }
 
 func AbsPath(path string) string {
-	if IsRelactivePath(path) {
-		path = GetExeDirPath() + string(os.PathSeparator) + path
+	if IsRelativePath(path) {
+		path = filepath.Join(GetExeDirPath(), path)
 		path, _ := filepath.Abs(path)
 		return path
 	}
 	return path
+}
+
+func Ext(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if len(ext) > 0 {
+		ext = ext[1:]
+	}
+	return ext
 }

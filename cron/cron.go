@@ -51,29 +51,31 @@ func (c *Cron) AddTask(t *Task) {
 }
 
 func (c *Cron) Run() {
-	tiker := time.NewTicker(c.tickerDuration)
+	ticker := time.NewTicker(c.tickerDuration)
 	sum := time.Duration(0)
 	for {
 		select {
-		case <-tiker.C:
+		case <-ticker.C:
 			sum += c.tickerDuration
 			for _, task := range c.tasks {
-				if sum%task.D == 0 {
-					if task.isProcessing(){
-						continue
-					}
-					task.SetProcessing(true)
-					go func(t *Task) {
-						defer func() {
-							t.SetProcessing(false)
-							if err := recover(); err != nil {
-								fmt.Println("panic:", err)
-							}
-						}()
-						t.F(c.ctx)
-					}(task)
+				if sum%task.D != 0 {
+					continue
 				}
+				if task.isProcessing() {
+					continue
+				}
+				task.SetProcessing(true)
+				go func(t *Task) {
+					defer func() {
+						t.SetProcessing(false)
+						if err := recover(); err != nil {
+							fmt.Println("panic:", err)
+						}
+					}()
+					t.F(c.ctx)
+				}(task)
 			}
+
 		case <-c.ctx.Done():
 			return
 		}
